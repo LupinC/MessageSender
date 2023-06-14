@@ -1,20 +1,17 @@
 package com.example.messagesender
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.provider.MediaStore
 import android.telephony.SmsManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -22,6 +19,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.messagesender.ui.theme.MessageSenderTheme
@@ -45,6 +43,11 @@ class MainActivity : ComponentActivity() {
 fun PhoneSenderScreen() {
     var phoneNumberState by remember { mutableStateOf("") }
     var messageState by remember { mutableStateOf("") }
+    var imageUri by remember { mutableStateOf<Uri?>(null) }
+    val context = LocalContext.current
+    val pickImageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        imageUri = uri
+    }
 
     Column(modifier = Modifier.padding()) {
         Text(text = "Enter phone numbers (one per line):")
@@ -67,7 +70,14 @@ fun PhoneSenderScreen() {
         )
 
         Button(
-            onClick = { sendMessage(phoneNumberState.split("\n"), messageState) },
+            onClick = { pickImageLauncher.launch("image/*") },
+            modifier = Modifier.align(Alignment.CenterHorizontally)
+        ) {
+            Text("Pick Image")
+        }
+
+        Button(
+            onClick = { sendMessage(context, phoneNumberState.split("\n"), messageState, imageUri) },
             modifier = Modifier.align(Alignment.End)
         ) {
             Text("Send Message")
@@ -75,10 +85,18 @@ fun PhoneSenderScreen() {
     }
 }
 
-fun sendMessage(phoneNumbers: List<String>, message: String) {
+fun sendMessage(context: Context, phoneNumbers: List<String>, message: String, imageUri: Uri?) {
     val smsManager = SmsManager.getDefault()
     for (number in phoneNumbers) {
-        smsManager.sendTextMessage(number.trim(), null, message, null, null)
+        val parts = smsManager.divideMessage(message)
+        val sendIntent = Intent(Intent.ACTION_SEND)
+        sendIntent.putExtra("address", number.trim())
+        sendIntent.putExtra("sms_body", message)
+        if (imageUri != null) {
+            sendIntent.putExtra(Intent.EXTRA_STREAM, imageUri)
+            sendIntent.type = context.contentResolver.getType(imageUri)
+        }
+        context.startActivity(sendIntent)
     }
 }
 
@@ -89,4 +107,3 @@ fun GreetingPreview() {
         PhoneSenderScreen()
     }
 }
-
